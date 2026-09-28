@@ -17,6 +17,12 @@ module AllGreen
       .map { |_, runs| runs.max_by { |run| run["id"] } }
   end
 
+  def latest_workflow_runs(workflow_runs)
+    workflow_runs
+      .group_by { |run| run["workflow_id"] }
+      .map { |_, runs| runs.max_by { |run| run["id"] } }
+  end
+
   def check_run_state(run)
     return :pending unless run["status"] == "completed" && run["conclusion"]
 
@@ -31,8 +37,9 @@ module AllGreen
     end
   end
 
-  def rows(check_runs, statuses, ignored)
-    rows = latest(check_runs).map { |run| [run["name"], check_run_state(run)] } +
+  def rows(workflow_runs, check_runs, statuses, ignored)
+    rows = latest_workflow_runs(workflow_runs).map { |run| [run["name"], check_run_state(run)] } +
+      latest(check_runs).map { |run| [run["name"], check_run_state(run)] } +
       statuses.map { |status| [status["context"], status_state(status)] }
 
     rows.reject { |name, _| ignored.any? { |pattern| pattern.match?(name) } }
@@ -139,23 +146,33 @@ if $PROGRAM_NAME == __FILE__
 
   client = AllGreen::Client.new(repo, ENV.fetch("GITHUB_TOKEN"))
   delays = AllGreen::RETRY_DELAYS.dup
-  suites = check_runs = statuses = issues = nil
+  workflow_runs = suites = check_runs = statuses = issues = nil
 
   loop do
-    suites = client.all("commits/#{sha}/check-suites?per_page=100", "check_suites")
-    check_runs = client.all("commits/#{sha}/check-runs?filter=all&per_page=100", "check_runs")
-    statuses = client.all("commits/#{sha}/status?per_page=100", "statuses")
-    issues = AllGreen.inconsistencies(suites, check_runs, statuses, trigger)
+    begin
+      workflow_runs = client.all("actions/runs?head_sha=#{sha}&per_page=100", "workflow_runs")
+      suites = client.all("commits/#{sha}/check-suites?per_page=100", "check_suites")
+      check_runs = client.all("commits/#{sha}/check-runs?filter=all&per_page=100", "check_runs")
+      statuses = client.all("commits/#{sha}/status?per_page=100", "statuses")
+      issues = AllGreen.inconsistencies(suites, check_runs, statuses, trigger)
+    rescue => error
+      issues = ["#{error.class}: #{error.message}"]
+    end
 
     break if issues.empty? || delays.empty?
 
     delay = delays.shift
-    puts "#{Time.now.utc.iso8601} stale read, retrying in #{delay}s:"
+    puts "#{Time.now.utc.iso8601} retrying in #{delay}s:"
     issues.each { |issue| puts "  #{issue}" }
     sleep delay
   end
 
-  rows = AllGreen.rows(check_runs, statuses, ignored)
+  if issues.any?
+    puts "::error::failed after retries: #{issues.join("; ")}"
+    exit 1
+  end
+
+  rows = AllGreen.rows(workflow_runs, check_runs, statuses, ignored)
   state, description = AllGreen.verdict(rows)
 
   rows.sort.each { |name, row_state| puts "#{row_state.to_s.ljust(8)} #{name}" }
@@ -168,10 +185,5 @@ if $PROGRAM_NAME == __FILE__
       description: description,
       target_url: "#{ENV.fetch("GITHUB_SERVER_URL", "https://github.com")}/#{repo}/actions/runs/#{ENV["GITHUB_RUN_ID"]}"
     })
-  end
-
-  if issues.any?
-    puts "::error::still inconsistent after retries: #{issues.join("; ")}"
-    exit 1
   end
 end
