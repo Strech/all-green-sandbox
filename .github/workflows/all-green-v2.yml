@@ -47,7 +47,7 @@ jobs:
           case "$FAULT" in
             crash) exit 1 ;;
             hang) sleep 600 ;;
-            kill) sudo pkill -9 -f Runner.Listener; sudo pkill -9 -f Runner.Worker; sleep 600 ;;
+            kill) sudo pkill -9 -f '[R]unner\.(Listener|Worker)'; sleep 600 ;;
           esac
         env:
           FAULT: ${{ inputs.fault }}
