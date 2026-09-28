@@ -3,7 +3,7 @@ name: All Green v2
 on: # yamllint disable-line rule:truthy
   workflow_run:
     workflows: ["*"]
-    types: [completed]
+    types: [requested, completed]
   status:
 
 concurrency:
@@ -31,7 +31,7 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha || github.event.sha }}
           GITHUB_TOKEN: ${{ github.token }}
           CONTEXT: all-jobs-are-green-v2
-          TRIGGER_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}
+          TRIGGER_SUITE_ID: ${{ github.event.action == 'completed' && github.event.workflow_run.check_suite_id || '' }}
           TRIGGER_STATUS_ID: ${{ github.event.id }}
           TRIGGER_CONTEXT: ${{ github.event.context }}
           IGNORED: |
