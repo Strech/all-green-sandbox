@@ -18,7 +18,8 @@ jobs:
     steps:
       - uses: DataDog/ensure-ci-success@b0d931ac77c810490e61964c321103040eef888e # v2.3.0
         with:
-          initial-delay-seconds: 60
+          initial-delay-seconds: 15
+          polling-interval: 15
           max-retries: 20
           ignored-name-patterns: |
             devflow/mergegate
