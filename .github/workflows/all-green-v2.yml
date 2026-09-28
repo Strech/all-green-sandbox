@@ -5,15 +5,30 @@ on: # yamllint disable-line rule:truthy
     workflows: ["*"]
     types: [in_progress, completed]
   status:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit SHA to evaluate
+        required: true
+      fault:
+        description: Sandbox fault injection
+        type: choice
+        default: none
+        options: [none, crash, hang, kill]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_sha || github.event.sha }}
+  group: ${{ github.workflow }}-${{ inputs.sha || github.event.workflow_run.head_sha || github.event.sha }}
   cancel-in-progress: true
 
 permissions:
   checks: read
   contents: read
   statuses: write
+  actions: read
+
+env:
+  SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.event.sha }}
+  CONTEXT: all-jobs-are-green-v2
 
 jobs:
   evaluate:
@@ -25,15 +40,41 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: .github/scripts
+      - name: Inject fault
+        if: inputs.fault && inputs.fault != 'none'
+        timeout-minutes: 1
+        run: |
+          case "$FAULT" in
+            crash) exit 1 ;;
+            hang) sleep 600 ;;
+            kill) sudo pkill -9 -f Runner.Listener; sudo pkill -9 -f Runner.Worker; sleep 600 ;;
+          esac
+        env:
+          FAULT: ${{ inputs.fault }}
       - name: Evaluate
         run: ruby .github/scripts/all_green.rb "$SHA"
         env:
-          SHA: ${{ github.event.workflow_run.head_sha || github.event.sha }}
           GITHUB_TOKEN: ${{ github.token }}
-          CONTEXT: all-jobs-are-green-v2
           TRIGGER_SUITE_ID: ${{ github.event.action == 'completed' && github.event.workflow_run.check_suite_id || '' }}
           TRIGGER_STATUS_ID: ${{ github.event.id }}
           TRIGGER_CONTEXT: ${{ github.event.context }}
           IGNORED: |
             devflow/mergegate
             all-jobs-are-green
+            Check Pull Request CI Status
+
+  report:
+    needs: evaluate
+    if: failure()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Report failure
+        run: >-
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA"
+          -f state=error
+          -f context="$CONTEXT"
+          -f description="Evaluation failed, re-run"
+          -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          GH_TOKEN: ${{ github.token }}
