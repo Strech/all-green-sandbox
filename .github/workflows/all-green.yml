@@ -19,7 +19,7 @@ jobs:
       - uses: DataDog/ensure-ci-success@b0d931ac77c810490e61964c321103040eef888e # v2.3.0
         with:
           initial-delay-seconds: 60
-          max-retries: 20
+          max-retries: 4
           ignored-name-patterns: |
             devflow/mergegate
             all-jobs-are-green-v2
