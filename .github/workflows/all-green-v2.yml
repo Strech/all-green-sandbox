@@ -3,7 +3,7 @@ name: All Green v2
 on: # yamllint disable-line rule:truthy
   workflow_run:
     workflows: ["*"]
-    types: [requested, completed]
+    types: [in_progress, completed]
   status:
 
 concurrency:
