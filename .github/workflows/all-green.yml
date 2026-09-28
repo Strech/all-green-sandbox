@@ -1,0 +1,25 @@
+name: Check Pull Request CI Status
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  checks: read
+  statuses: read
+
+jobs:
+  all-jobs-are-green:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: DataDog/ensure-ci-success@b0d931ac77c810490e61964c321103040eef888e # v2.3.0
+        with:
+          initial-delay-seconds: 60
+          max-retries: 20
+          ignored-name-patterns: |
+            devflow/mergegate
+            all-jobs-are-green-v2

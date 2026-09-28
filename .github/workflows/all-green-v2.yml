@@ -1,0 +1,39 @@
+name: All Green v2
+
+on: # yamllint disable-line rule:truthy
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+  status:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_sha || github.event.sha }}
+  cancel-in-progress: true
+
+permissions:
+  checks: read
+  contents: read
+  statuses: write
+
+jobs:
+  evaluate:
+    if: github.event.workflow_run.name != github.workflow && github.event.context != 'all-jobs-are-green-v2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Evaluate
+        run: ruby .github/scripts/all_green.rb "$SHA"
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || github.event.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          CONTEXT: all-jobs-are-green-v2
+          TRIGGER_SUITE_ID: ${{ github.event.workflow_run.check_suite_id }}
+          TRIGGER_STATUS_ID: ${{ github.event.id }}
+          TRIGGER_CONTEXT: ${{ github.event.context }}
+          IGNORED: |
+            devflow/mergegate
+            all-jobs-are-green

@@ -1,0 +1,71 @@
+name: Unit Tests
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ruby-40:
+    name: "Ruby 4.0"
+    uses: ./.github/workflows/_unit_test.yml
+    with:
+      version: "4.0"
+
+  ruby-34:
+    name: "Ruby 3.4"
+    uses: ./.github/workflows/_unit_test.yml
+    with:
+      version: "3.4"
+
+  ruby-33:
+    name: "Ruby 3.3"
+    uses: ./.github/workflows/_unit_test.yml
+    with:
+      version: "3.3"
+
+  ruby-27:
+    name: "Ruby 2.7"
+    uses: ./.github/workflows/_unit_test.yml
+    with:
+      version: "2.7"
+
+  ruby-25:
+    name: "Ruby 2.5"
+    uses: ./.github/workflows/_unit_test.yml
+    with:
+      version: "2.5"
+
+  junit:
+    name: dd/junit
+    needs: [ruby-40, ruby-34, ruby-33, ruby-27, ruby-25]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    env:
+      JOB: junit
+    steps: &steps
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .sandbox
+      - run: .sandbox/job.sh
+
+  coverage:
+    name: dd/coverage
+    needs: [ruby-40, ruby-34, ruby-33, ruby-27, ruby-25]
+    runs-on: ubuntu-24.04
+    env:
+      JOB: coverage
+    steps: *steps
+
+  complete:
+    name: Unit Tests (complete)
+    needs: [ruby-40, ruby-34, ruby-33, ruby-27, ruby-25]
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok

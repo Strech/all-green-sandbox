@@ -1,0 +1,41 @@
+name: Lock Dependencies
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency:
+    name: Dependency changes
+    runs-on: ubuntu-24.04
+    outputs:
+      changes: ${{ steps.changes.outputs.changes }}
+    steps:
+      - id: changes
+        run: echo "changes=false" >> "$GITHUB_OUTPUT"
+
+  lock:
+    needs: dependency
+    if: ${{ needs.dependency.outputs.changes == 'true' }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [ruby-3.4, ruby-3.3, jruby-9.4]
+    env:
+      JOB: lock/${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .sandbox
+      - run: .sandbox/job.sh
+
+  complete:
+    name: Lock Dependencies (complete)
+    needs: lock
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok

@@ -1,0 +1,33 @@
+name: Nix
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: "Test Nix (${{ matrix.platform }}, 24.05)"
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x86_64-linux, aarch64-linux, aarch64-darwin]
+    env:
+      JOB: nix/${{ matrix.platform }}
+      MIN: 90
+      MAX: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .sandbox
+      - run: .sandbox/job.sh
+
+  complete:
+    name: Nix (complete)
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok

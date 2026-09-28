@@ -1,0 +1,56 @@
+name: Unit Test Template
+
+on: # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  batch:
+    runs-on: ubuntu-24.04
+    outputs:
+      batches: ${{ steps.batch.outputs.batches }}
+      misc: ${{ steps.batch.outputs.misc }}
+    steps:
+      - id: batch
+        run: |
+          echo 'batches={"include":[{"batch":1},{"batch":2},{"batch":3},{"batch":4}]}' >> "$GITHUB_OUTPUT"
+          echo 'misc={"include":[{"batch":1},{"batch":2}]}' >> "$GITHUB_OUTPUT"
+
+  build-test-standard:
+    name: "build & test (standard) [${{ matrix.batch }}]"
+    needs: batch
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.batch.outputs.batches).include }}
+    env:
+      JOB: ruby-${{ inputs.version }}/standard-${{ matrix.batch }}
+      MIN: 60
+      MAX: 180
+    steps: &steps
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .sandbox
+      - run: .sandbox/job.sh
+
+  build-test-misc:
+    name: "build & test (misc) [${{ matrix.batch }}]"
+    needs: batch
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.batch.outputs.misc).include }}
+    env:
+      JOB: ruby-${{ inputs.version }}/misc-${{ matrix.batch }}
+      MIN: 30
+      MAX: 90
+    steps: *steps

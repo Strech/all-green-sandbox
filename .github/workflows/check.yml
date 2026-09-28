@@ -1,0 +1,134 @@
+name: Static Analysis
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    env:
+      JOB: check/build
+      MIN: 20
+      MAX: 40
+    steps: &steps
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .sandbox
+      - run: .sandbox/job.sh
+
+  standard:
+    name: standard/lint
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      JOB: standard
+      MIN: 20
+      MAX: 40
+    steps: *steps
+
+  rubocop:
+    name: rubocop/lint
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      JOB: rubocop
+      MIN: 20
+      MAX: 40
+    steps: *steps
+
+  steep:
+    name: steep/typecheck
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      JOB: steep
+      MIN: 60
+      MAX: 120
+    steps: *steps
+
+  bundler-audit:
+    name: bundler-audit
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      JOB: bundler-audit
+    steps: *steps
+
+  checksum-coverage:
+    name: checksum-coverage
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      JOB: checksum-coverage
+    steps: *steps
+
+  green-ci-exclude-metrics:
+    name: green-ci/exclude-metrics
+    runs-on: ubuntu-24.04
+    env:
+      JOB: green-ci-exclude-metrics
+    steps: *steps
+
+  changelog:
+    name: changelog/check
+    runs-on: ubuntu-24.04
+    env:
+      JOB: changelog
+    steps: *steps
+
+  semgrep:
+    name: semgrep/ci
+    runs-on: ubuntu-24.04
+    env:
+      JOB: semgrep
+      MIN: 30
+      MAX: 60
+    steps: *steps
+
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-24.04
+    env:
+      JOB: zizmor
+    steps: *steps
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-24.04
+    env:
+      JOB: actionlint
+    steps: *steps
+
+  yaml-lint:
+    name: yaml-lint
+    runs-on: ubuntu-24.04
+    env:
+      JOB: yaml-lint
+    steps: *steps
+
+  complete:
+    name: Static Analysis (complete)
+    needs:
+      - steep
+      - standard
+      - rubocop
+      - semgrep
+      - zizmor
+      - actionlint
+      - yaml-lint
+      - checksum-coverage
+      - bundler-audit
+      - green-ci-exclude-metrics
+      - changelog
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok

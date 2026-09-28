@@ -1,0 +1,37 @@
+name: Test YJIT
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-yjit:
+    name: "Test YJIT (ubuntu-24.04, ${{ matrix.ruby }} ${{ matrix.rubyopt }})"
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["4.0", "3.4", "3.3"]
+        rubyopt: ["--yjit", "--yjit --yjit-stats"]
+        exclude:
+          - ruby: "3.3"
+            rubyopt: "--yjit --yjit-stats"
+    env:
+      JOB: yjit/${{ matrix.ruby }}
+      MIN: 60
+      MAX: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .sandbox
+      - run: .sandbox/job.sh
+
+  complete:
+    name: Test YJIT (complete)
+    needs: test-yjit
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok

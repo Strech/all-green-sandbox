@@ -1,0 +1,36 @@
+name: Test for memory leaks
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-memcheck:
+    runs-on: ubuntu-24.04
+    env:
+      JOB: memcheck
+      MIN: 90
+      MAX: 180
+    steps: &steps
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .sandbox
+      - run: .sandbox/job.sh
+
+  test-asan:
+    runs-on: ubuntu-24.04
+    env:
+      JOB: asan
+      MIN: 90
+      MAX: 180
+    steps: *steps
+
+  complete:
+    name: Test for memory leaks (complete)
+    needs: [test-memcheck, test-asan]
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo ok
