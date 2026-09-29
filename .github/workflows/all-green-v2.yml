@@ -29,6 +29,7 @@ permissions:
 env:
   SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.event.sha }}
   CONTEXT: all-jobs-are-green-v2
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
 jobs:
   evaluate:
@@ -36,6 +37,20 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - name: Mark pending
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          github.event.action == 'in_progress' ||
+          (github.event.action == 'completed' && !contains(fromJSON('["success","skipped","neutral"]'), github.event.workflow_run.conclusion)) ||
+          (github.event_name == 'status' && github.event.state != 'success')
+        run: >-
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA"
+          -f state=pending
+          -f context="$CONTEXT"
+          -f description="Evaluating"
+          -f target_url="$RUN_URL"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -47,7 +62,7 @@ jobs:
           case "$FAULT" in
             crash) exit 1 ;;
             hang) sleep 600 ;;
-            kill) sudo pkill -9 -f Runner.Listener; sudo pkill -9 -f Runner.Worker; sleep 600 ;;
+            kill) sudo pkill -9 -f '[R]unner\.(Listener|Worker)'; sleep 600 ;;
           esac
         env:
           FAULT: ${{ inputs.fault }}
@@ -70,11 +85,15 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Report failure
-        run: >-
-          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA"
-          -f state=error
-          -f context="$CONTEXT"
-          -f description="Evaluation failed, re-run"
-          -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        run: |
+          for delay in 10 20 40 80 0; do
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+              -f state=error \
+              -f context="$CONTEXT" \
+              -f description="Evaluation failed, re-run" \
+              -f target_url="$RUN_URL" && exit 0
+            sleep "$delay"
+          done
+          exit 1
         env:
           GH_TOKEN: ${{ github.token }}
