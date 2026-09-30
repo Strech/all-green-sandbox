@@ -77,6 +77,8 @@ jobs:
             devflow/mergegate
             all-jobs-are-green
             Check Pull Request CI Status
+            All Green v3
+            all-jobs-are-green-v3
 
   report:
     needs: evaluate

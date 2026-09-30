@@ -1,0 +1,37 @@
+name: All Green v3
+
+on: # yamllint disable-line rule:truthy
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  statuses: read
+
+jobs:
+  all-jobs-are-green-v3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Wait for green
+        run: ruby .github/scripts/all_green_loop.rb "$SHA"
+        env:
+          SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          POLL_INTERVAL: 15
+          CONTEXT: all-jobs-are-green-v3
+          IGNORED: |
+            All Green v3
+            devflow/mergegate
+            all-jobs-are-green
+            all-jobs-are-green-v2
+            Check Pull Request CI Status
