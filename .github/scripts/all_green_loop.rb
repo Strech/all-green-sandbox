@@ -5,12 +5,14 @@ require_relative "all_green"
 $stdout.sync = true
 
 sha = ARGV.fetch(0)
+delay = Integer(ENV.fetch("INITIAL_DELAY", "0"))
 interval = Integer(ENV.fetch("POLL_INTERVAL", "30"))
 ignored = AllGreen.ignored(ENV.fetch("CONTEXT"), ENV.fetch("IGNORED", ""))
 client = AllGreen::Client.new(ENV.fetch("GITHUB_REPOSITORY"), ENV.fetch("GITHUB_TOKEN"))
 
 loop do
-  sleep interval
+  sleep delay
+  delay = interval
 
   begin
     data = AllGreen.fetch(client, sha)
