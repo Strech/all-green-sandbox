@@ -52,8 +52,11 @@ module AllGreen
   end
 
   def rows(workflow_runs, check_runs, statuses, ignored)
-    rows = latest_workflow_runs(workflow_runs).map { |run| [run["name"], check_run_state(run)] } +
-      latest(check_runs).map { |run| [run["name"], check_run_state(run)] } +
+    workflows = latest_workflow_runs(workflow_runs)
+    running = workflows.reject { |run| run["status"] == "completed" }.map { |run| run["check_suite_id"] }
+
+    rows = workflows.map { |run| [run["name"], check_run_state(run)] } +
+      latest(check_runs).map { |run| [run["name"], running.include?(run.dig("check_suite", "id")) ? :pending : check_run_state(run)] } +
       statuses.map { |status| [status["context"], status_state(status)] }
 
     rows.reject { |name, _| ignored.any? { |pattern| pattern.match?(name) } }
