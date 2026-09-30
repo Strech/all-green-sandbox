@@ -19,7 +19,7 @@ if [ "$GITHUB_RUN_ATTEMPT" = "1" ] && matches flaky; then
   exit 1
 fi
 
-seconds=$((min + RANDOM % (max - min + 1)))
+seconds=$(((min + RANDOM % (max - min + 1)) / 4))
 matches slow && seconds=$((seconds * 5))
 
 echo "running $job for ${seconds}s"
