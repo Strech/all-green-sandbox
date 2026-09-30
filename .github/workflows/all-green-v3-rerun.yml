@@ -22,8 +22,12 @@ jobs:
     steps:
       - name: Rerun gate
         run: |
-          id=$(gh run list -R "$GITHUB_REPOSITORY" -w all-green-v3.yml -c "$SHA" -L 1 --json databaseId --jq '.[0].databaseId')
-          if [ "$(gh run view "$id" -R "$GITHUB_REPOSITORY" --json status --jq .status)" != completed ]; then
+          read -r id status started < <(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/all-green-v3.yml/runs?head_sha=$SHA&per_page=1" --jq '.workflow_runs[0] | "\(.id) \(.status) \(.run_started_at)"')
+          if [[ "$started" > "$TRIGGER_STARTED" ]]; then
+            echo "Gate attempt started $started, after $TRIGGER_STARTED"
+            exit 0
+          fi
+          if [ "$status" != completed ]; then
             gh run cancel "$id" -R "$GITHUB_REPOSITORY"
             gh run watch "$id" -R "$GITHUB_REPOSITORY" > /dev/null
           fi
@@ -31,3 +35,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_STARTED: ${{ github.event.workflow_run.run_started_at }}
