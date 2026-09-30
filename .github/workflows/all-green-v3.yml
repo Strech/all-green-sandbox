@@ -27,7 +27,8 @@ jobs:
         env:
           SHA: ${{ github.event.pull_request.head.sha }}
           GITHUB_TOKEN: ${{ github.token }}
-          POLL_INTERVAL: 15
+          INITIAL_DELAY: 120
+          POLL_INTERVAL: 60
           CONTEXT: all-jobs-are-green-v3
           IGNORED: |
             All Green v3
