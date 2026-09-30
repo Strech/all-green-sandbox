@@ -24,3 +24,4 @@ jobs:
           ignored-name-patterns: |
             devflow/mergegate
             all-jobs-are-green-v2
+            all-jobs-are-green-v3

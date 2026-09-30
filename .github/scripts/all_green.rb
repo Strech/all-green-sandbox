@@ -11,6 +11,20 @@ module AllGreen
 
   module_function
 
+  def ignored(context, patterns)
+    [/\A#{Regexp.escape(context)}\z/] +
+      patterns.split("\n").map(&:strip).reject(&:empty?).map { |pattern| /\A#{pattern}\z/ }
+  end
+
+  def fetch(client, sha)
+    {
+      workflow_runs: client.all("actions/runs?head_sha=#{sha}&per_page=100", "workflow_runs"),
+      suites: client.all("commits/#{sha}/check-suites?per_page=100", "check_suites"),
+      check_runs: client.all("commits/#{sha}/check-runs?filter=all&per_page=100", "check_runs"),
+      statuses: client.all("commits/#{sha}/status?per_page=100", "statuses")
+    }
+  end
+
   def latest(check_runs)
     check_runs
       .group_by { |run| [run.dig("app", "id"), run["name"]] }
@@ -136,8 +150,7 @@ if $PROGRAM_NAME == __FILE__
   repo = ENV.fetch("GITHUB_REPOSITORY")
   sha = ARGV.fetch(0)
   context = ENV.fetch("CONTEXT", "all-jobs-are-green")
-  ignored = [/\A#{Regexp.escape(context)}\z/] +
-    ENV.fetch("IGNORED", "").split("\n").map(&:strip).reject(&:empty?).map { |pattern| /\A#{pattern}\z/ }
+  ignored = AllGreen.ignored(context, ENV.fetch("IGNORED", ""))
   trigger = {
     suite_id: ENV["TRIGGER_SUITE_ID"].to_s.empty? ? nil : Integer(ENV["TRIGGER_SUITE_ID"]),
     context: ENV["TRIGGER_CONTEXT"].to_s.empty? ? nil : ENV["TRIGGER_CONTEXT"],
@@ -146,15 +159,12 @@ if $PROGRAM_NAME == __FILE__
 
   client = AllGreen::Client.new(repo, ENV.fetch("GITHUB_TOKEN"))
   delays = AllGreen::RETRY_DELAYS.dup
-  workflow_runs = suites = check_runs = statuses = issues = nil
+  data = issues = nil
 
   loop do
     begin
-      workflow_runs = client.all("actions/runs?head_sha=#{sha}&per_page=100", "workflow_runs")
-      suites = client.all("commits/#{sha}/check-suites?per_page=100", "check_suites")
-      check_runs = client.all("commits/#{sha}/check-runs?filter=all&per_page=100", "check_runs")
-      statuses = client.all("commits/#{sha}/status?per_page=100", "statuses")
-      issues = AllGreen.inconsistencies(suites, check_runs, statuses, trigger)
+      data = AllGreen.fetch(client, sha)
+      issues = AllGreen.inconsistencies(data[:suites], data[:check_runs], data[:statuses], trigger)
     rescue => error
       issues = ["#{error.class}: #{error.message}"]
     end
@@ -172,7 +182,7 @@ if $PROGRAM_NAME == __FILE__
     exit 1
   end
 
-  rows = AllGreen.rows(workflow_runs, check_runs, statuses, ignored)
+  rows = AllGreen.rows(data[:workflow_runs], data[:check_runs], data[:statuses], ignored)
   state, description = AllGreen.verdict(rows)
 
   rows.sort.each { |name, row_state| puts "#{row_state.to_s.ljust(8)} #{name}" }

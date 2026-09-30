@@ -1,0 +1,33 @@
+name: All Green v3 rerun
+
+on: # yamllint disable-line rule:truthy
+  workflow_run:
+    workflows: ["*"]
+    types: [in_progress]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.run_attempt > 1 && github.event.workflow_run.head_sha || github.run_id }}
+
+permissions:
+  actions: write
+
+jobs:
+  rerun:
+    if: >-
+      github.event.workflow_run.run_attempt > 1 &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.name != 'All Green v3'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Rerun gate
+        run: |
+          id=$(gh run list -R "$GITHUB_REPOSITORY" -w all-green-v3.yml -c "$SHA" -L 1 --json databaseId --jq '.[0].databaseId')
+          if [ "$(gh run view "$id" -R "$GITHUB_REPOSITORY" --json status --jq .status)" != completed ]; then
+            gh run cancel "$id" -R "$GITHUB_REPOSITORY"
+            gh run watch "$id" -R "$GITHUB_REPOSITORY" > /dev/null
+          fi
+          gh run rerun "$id" -R "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
