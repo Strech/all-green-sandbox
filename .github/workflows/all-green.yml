@@ -20,7 +20,7 @@ jobs:
         with:
           initial-delay-seconds: 15
           polling-interval: 15
-          max-retries: 20
+          max-retries: 4
           ignored-name-patterns: |
             devflow/mergegate
             all-jobs-are-green-v2
